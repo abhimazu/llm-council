@@ -63,3 +63,42 @@
   color: #333;
   line-height: 1.6;
 }
+
+/* Error + partial states (added by changes branch) */
+.stage-status-warn {
+  font-size: 0.85em;
+  color: #c47b00;
+  font-weight: normal;
+}
+.tab-error {
+  color: #b30000;
+  border-color: #f5b3b3 !important;
+}
+.error-dot {
+  color: #b30000;
+  margin-right: 4px;
+}
+.model-error .error-banner {
+  background: #fff3f3;
+  border: 1px solid #f5b3b3;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.95em;
+}
+.model-error .error-kind {
+  background: #b30000;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.error-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  font-size: 0.9em;
+}
+.error-details dt { color: #777; }
+.error-details dd { margin: 0; }

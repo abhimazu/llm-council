@@ -151,3 +151,56 @@
   color: #999;
   font-size: 12px;
 }
+
+/* Error + partial-parse states (added by changes branch) */
+.stage-status-warn {
+  font-size: 0.85em;
+  color: #c47b00;
+  font-weight: normal;
+}
+.tab-error {
+  color: #b30000;
+  border-color: #f5b3b3 !important;
+}
+.tab-partial {
+  border-color: #e0a040 !important;
+}
+.error-dot { color: #b30000; margin-right: 4px; }
+.partial-dot { color: #e0a040; margin-right: 4px; }
+.stage-badge {
+  display: inline-block;
+  font-size: 0.75em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-warn { background: #fff3d6; color: #8a5b00; border: 1px solid #e0c080; }
+.badge-error { background: #ffe5e5; color: #8a0000; border: 1px solid #f0a0a0; }
+.parse-reason {
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: #6a4a00;
+  background: #fffbf0;
+  padding: 6px 10px;
+  border-left: 3px solid #e0a040;
+}
+.ranker-error .error-banner {
+  background: #fff3f3;
+  border: 1px solid #f5b3b3;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 8px 0;
+}
+.ranker-error .error-kind {
+  background: #b30000;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.aggregate-partial { background: #fffbf0; }
+.rank-partial-flag { color: #c47b00; font-weight: 500; }
