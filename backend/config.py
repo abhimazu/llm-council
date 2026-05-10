@@ -62,6 +62,12 @@ CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
 # main response flow.
 TITLE_MODEL = "google/gemini-2.5-flash"
 
+# Routing classifier model — used by backend/router.py to decide whether a
+# query needs the full council or can be answered by the chairman alone.
+# Should be small/cheap; the classifier itself isn't expected to be smart,
+# just consistent. ~$0.0001 per call at this size.
+ROUTING_MODEL = "google/gemini-2.5-flash"
+
 
 # ---------------------------------------------------------------------------
 # Per-stage output caps. ``None`` = uncapped.
