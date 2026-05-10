@@ -1,5 +1,18 @@
 # LLM Council
 
+> **`changes` branch:** this branch contains the §2 critical refactor from
+> the production-readiness audit. The original silent-failure pattern in
+> `backend/openrouter.py` and `backend/council.py` has been replaced with
+> structured errors that flow end-to-end. See **[CHANGES.md](CHANGES.md)**
+> for the full list, wire-protocol changes the frontend must handle, and
+> what's intentionally **not** in this branch.
+>
+> **45 unit tests pass.** Run with `pytest tests/ -v`.
+
+---
+
+# LLM Council
+
 ![llmcouncil](header.jpg)
 
 The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
