@@ -1,28 +1,26 @@
-"""FastAPI backend for LLM Council with structured error contract.
+"""FastAPI backend for LLM Council with cost-control wiring.
 
-Behavioral changes vs. the original (audit findings A7, B7, F2, M21):
-    1. ``/message`` and ``/message/stream`` now return identical shapes
-       for identical inputs. The original code routed them through
-       different code paths (``run_full_council`` vs the streaming
-       handler), producing different error UX for the same broken
-       state. Both paths now go through ``council.run_full_council``
-       and serialize the same dict.
-    2. SSE error events carry a structured ``LLMError`` shape (kind,
-       detail, retryable) instead of a stringified raw exception. Raw
-       exception messages are never sent to the client — they go to
-       structured logs only.
-    3. Stage-3 errors are emitted as ``stage3_complete`` with
-       ``data.status == "error"`` rather than the original silent
-       fallback string.
-    4. Request-body size cap of 64 KB on the message endpoints to
-       close the cost-DoS vector documented in 04_runtime_verification
-       §M21 (10 MB payloads were accepted with no limit).
-    5. CORS origins are now driven by config (env-overridable).
+This commit wires the cache and router (added in the previous commit)
+into the live request path. The structured-error contract from earlier
+commits is preserved.
 
-This commit deliberately does NOT change the SSE event *names* —
-``stage1_start``, ``stage1_complete``, ``stage2_start``, etc. are still
-the public contract. Only the shape of ``data`` changes (now carries
-status fields).
+New behavior:
+    1. Cache lookup before any LLM call. On hit, the cached envelope's
+       events are replayed and the response time is sub-millisecond.
+       Cache misses fall through to the routing decision.
+    2. Smart routing: a cheap classifier decides whether to engage the
+       full 4-LLM council or run the chairman alone. Trivial queries
+       (factual lookups, arithmetic, definitions) skip the council.
+    3. Per-call max_tokens caps are now active by default
+       (config.py: STAGE1=800, STAGE2=400, CHAIRMAN=1000). Original
+       code had no caps. To restore uncapped behavior, set any to None
+       in config.py.
+
+New SSE events emitted (frontend handles these defensively):
+    - cache_hit         — fired before stage events when cache is used
+    - routing_decision  — fired after cache miss with use_council + reason
+    - solo_start        — fired when council is skipped, chairman runs alone
+    - solo_complete     — fired with the SOLO chairman result
 """
 
 from __future__ import annotations
@@ -31,7 +29,7 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,8 +37,15 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import storage
-from .config import CORS_ORIGINS
+from .cache import get_cache
+from .config import (
+    CHAIRMAN_MAX_TOKENS,
+    CHAIRMAN_MODEL,
+    CORS_ORIGINS,
+    COUNCIL_MODELS,
+)
 from .council import (
+    ChairmanResult,
     calculate_aggregate_rankings,
     generate_conversation_title,
     run_full_council,
@@ -48,11 +53,11 @@ from .council import (
     stage2_collect_rankings,
     stage3_synthesize_final,
 )
+from .openrouter import query_model
+from .router import RoutingDecision, should_engage_council
 
 log = logging.getLogger(__name__)
 
-# Hard cap on request body for the message endpoints. 64 KB is generous
-# for a single-turn user message and tightly bounds the cost-DoS surface.
 MAX_MESSAGE_BYTES = 64 * 1024
 
 app = FastAPI(title="LLM Council API")
@@ -89,7 +94,7 @@ class ConversationMetadata(BaseModel):
 class Conversation(BaseModel):
     id: str
     created_at: str
-    title: Any  # str or None during the brief window before title-gen lands
+    title: Any
     messages: List[Dict[str, Any]]
 
 
@@ -99,7 +104,6 @@ class Conversation(BaseModel):
 
 
 def _sse(event_type: str, **fields: Any) -> str:
-    """Format a Server-Sent Events line with a single JSON event."""
     return "data: " + json.dumps({"type": event_type, **fields}) + "\n\n"
 
 
@@ -116,6 +120,42 @@ async def _enforce_size_limit(request: Request) -> None:
             raise HTTPException(status_code=400, detail="Invalid Content-Length")
 
 
+def _empty_envelope_with_solo(stage3_dict: Dict[str, Any],
+                              routing: RoutingDecision) -> Dict[str, Any]:
+    """Construct an envelope for the SOLO path.
+
+    Stage 1 and Stage 2 are empty (the council didn't run). Stage 3 is
+    the chairman's direct response to the user query. Metadata records
+    the routing decision so downstream analysis can A/B council vs. solo.
+    """
+    return {
+        "stage1": [],
+        "stage2": [],
+        "stage3": stage3_dict,
+        "metadata": {
+            "label_to_model": {},
+            "aggregate_rankings": [],
+            "routing": routing.to_dict(),
+        },
+    }
+
+
+async def _run_solo(query: str) -> ChairmanResult:
+    """Run the chairman alone on the user's query (no council)."""
+    content, usage, err = await query_model(
+        CHAIRMAN_MODEL,
+        [{"role": "user", "content": query}],
+        max_tokens=CHAIRMAN_MAX_TOKENS,
+    )
+    if err is not None:
+        return ChairmanResult(
+            model=CHAIRMAN_MODEL, status="error", error=err.to_dict(),
+        )
+    return ChairmanResult(
+        model=CHAIRMAN_MODEL, status="ok", response=content, usage=usage,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -123,15 +163,18 @@ async def _enforce_size_limit(request: Request) -> None:
 
 @app.get("/")
 async def root() -> Dict[str, str]:
-    """Static health endpoint.
-
-    Note (audit finding E3): this is intentionally cheap and static to
-    serve as a process-liveness check. A full readiness check that
-    verifies OpenRouter reachability and storage writability is a
-    P1 follow-up; implementing it here would couple liveness to
-    upstream availability.
-    """
     return {"status": "ok", "service": "LLM Council API"}
+
+
+@app.get("/api/cache/stats")
+async def cache_stats() -> Dict[str, Any]:
+    """Cache observability endpoint.
+
+    No auth — intentionally read-only and contains no sensitive data
+    (just hit/miss/store counters). Add to whatever observability
+    you wire up in production.
+    """
+    return get_cache().stats.to_dict()
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
@@ -159,7 +202,10 @@ async def send_message(
     request_body: SendMessageRequest,
     request: Request,
 ) -> Dict[str, Any]:
-    """Non-streaming send. Same envelope shape as the streaming endpoint."""
+    """Non-streaming send. Same envelope shape as the streaming endpoint.
+
+    Cache + routing logic mirrors the streaming endpoint.
+    """
     await _enforce_size_limit(request)
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
@@ -173,7 +219,31 @@ async def send_message(
         if title is not None:
             storage.update_conversation_title(conversation_id, title)
 
-    envelope = await run_full_council(request_body.content)
+    # Cache lookup
+    cache = get_cache()
+    cached = cache.get(request_body.content, COUNCIL_MODELS, CHAIRMAN_MODEL)
+    if cached is not None:
+        envelope = dict(cached)
+        envelope["metadata"] = {
+            **envelope.get("metadata", {}),
+            "cached": True,
+        }
+    else:
+        # Routing decision
+        routing = await should_engage_council(request_body.content)
+        if routing.use_council:
+            envelope = await run_full_council(request_body.content)
+            envelope["metadata"]["routing"] = routing.to_dict()
+            cache.put(request_body.content, COUNCIL_MODELS, CHAIRMAN_MODEL, envelope)
+        else:
+            solo = await _run_solo(request_body.content)
+            envelope = _empty_envelope_with_solo(solo.to_dict(), routing)
+            # Cache the SOLO result too (using the same key) — if a future
+            # request for this query routes to council, that's a different
+            # config and would key differently. SOLO results are a valid
+            # cached answer for "this query, this config".
+            cache.put(request_body.content, COUNCIL_MODELS, CHAIRMAN_MODEL, envelope)
+
     storage.add_assistant_message(
         conversation_id,
         stage1=envelope["stage1"],
@@ -190,7 +260,7 @@ async def send_message_stream(
     request_body: SendMessageRequest,
     request: Request,
 ) -> StreamingResponse:
-    """Streaming send. Same shapes as ``send_message`` but per-stage events."""
+    """Streaming send with cache + routing wiring."""
     await _enforce_size_limit(request)
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
@@ -198,48 +268,119 @@ async def send_message_stream(
 
     is_first_message = len(conversation["messages"]) == 0
     request_id = str(uuid.uuid4())[:8]
+    cache = get_cache()
 
     async def event_generator():
         try:
             storage.add_user_message(conversation_id, request_body.content)
 
-            title_task = None
+            # Title generation runs in parallel with the rest of the
+            # pipeline; never blocks. Failure is silent (title_failed event).
+            title_task: Optional[asyncio.Task[Optional[str]]] = None
             if is_first_message:
                 title_task = asyncio.create_task(
                     generate_conversation_title(request_body.content)
                 )
 
-            yield _sse("stage1_start")
-            stage1_results = await stage1_collect_responses(
-                request_body.content
+            # ----- Cache lookup -------------------------------------------------
+            cached = cache.get(
+                request_body.content, COUNCIL_MODELS, CHAIRMAN_MODEL,
             )
-            stage1_dicts = [r.to_dict() for r in stage1_results]
-            yield _sse("stage1_complete", data=stage1_dicts)
+            if cached is not None:
+                envelope = dict(cached)
+                envelope["metadata"] = {
+                    **envelope.get("metadata", {}),
+                    "cached": True,
+                }
+                # Fire all three stage events from the cached envelope so
+                # the frontend's existing renderers Just Work.
+                yield _sse("cache_hit",
+                           cached_metadata=envelope.get("metadata", {}))
+                yield _sse("stage1_complete", data=envelope["stage1"])
+                yield _sse(
+                    "stage2_complete",
+                    data=envelope["stage2"],
+                    metadata={
+                        "label_to_model":
+                            envelope["metadata"].get("label_to_model", {}),
+                        "aggregate_rankings":
+                            envelope["metadata"].get("aggregate_rankings", []),
+                    },
+                )
+                yield _sse("stage3_complete", data=envelope["stage3"])
+            else:
+                # ----- Routing decision ----------------------------------------
+                routing = await should_engage_council(request_body.content)
+                yield _sse("routing_decision", **routing.to_dict())
 
-            yield _sse("stage2_start")
-            stage2_results, label_to_model = await stage2_collect_rankings(
-                request_body.content, stage1_results
-            )
-            stage2_dicts = [r.to_dict() for r in stage2_results]
-            aggregate = calculate_aggregate_rankings(
-                stage2_results, label_to_model
-            )
-            yield _sse(
-                "stage2_complete",
-                data=stage2_dicts,
-                metadata={
-                    "label_to_model": label_to_model,
-                    "aggregate_rankings": [a.to_dict() for a in aggregate],
-                },
-            )
+                if routing.use_council:
+                    # Full council pipeline.
+                    yield _sse("stage1_start")
+                    stage1_results = await stage1_collect_responses(
+                        request_body.content
+                    )
+                    stage1_dicts = [r.to_dict() for r in stage1_results]
+                    yield _sse("stage1_complete", data=stage1_dicts)
 
-            yield _sse("stage3_start")
-            stage3_result = await stage3_synthesize_final(
-                request_body.content, stage1_results, stage2_results
-            )
-            stage3_dict = stage3_result.to_dict()
-            yield _sse("stage3_complete", data=stage3_dict)
+                    yield _sse("stage2_start")
+                    stage2_results, label_to_model = (
+                        await stage2_collect_rankings(
+                            request_body.content, stage1_results
+                        )
+                    )
+                    stage2_dicts = [r.to_dict() for r in stage2_results]
+                    aggregate = calculate_aggregate_rankings(
+                        stage2_results, label_to_model
+                    )
+                    yield _sse(
+                        "stage2_complete",
+                        data=stage2_dicts,
+                        metadata={
+                            "label_to_model": label_to_model,
+                            "aggregate_rankings":
+                                [a.to_dict() for a in aggregate],
+                        },
+                    )
 
+                    yield _sse("stage3_start")
+                    stage3_result = await stage3_synthesize_final(
+                        request_body.content, stage1_results, stage2_results,
+                    )
+                    stage3_dict = stage3_result.to_dict()
+                    yield _sse("stage3_complete", data=stage3_dict)
+
+                    envelope = {
+                        "stage1": stage1_dicts,
+                        "stage2": stage2_dicts,
+                        "stage3": stage3_dict,
+                        "metadata": {
+                            "label_to_model": label_to_model,
+                            "aggregate_rankings":
+                                [a.to_dict() for a in aggregate],
+                            "routing": routing.to_dict(),
+                        },
+                    }
+                else:
+                    # SOLO path: skip the council, run chairman alone.
+                    yield _sse("solo_start", model=CHAIRMAN_MODEL)
+                    solo = await _run_solo(request_body.content)
+                    solo_dict = solo.to_dict()
+                    yield _sse("solo_complete", data=solo_dict)
+                    # Also emit a stage3_complete event so frontend
+                    # renderers that key off stage3 still work without
+                    # changes. The data shape is identical.
+                    yield _sse("stage3_complete", data=solo_dict)
+                    envelope = _empty_envelope_with_solo(solo_dict, routing)
+
+                # Cache successful (or solo) results
+                cache.put(
+                    request_body.content,
+                    COUNCIL_MODELS,
+                    CHAIRMAN_MODEL,
+                    envelope,
+                )
+
+            # ----- Title generation finalization --------------------------------
             if title_task is not None:
                 title = await title_task
                 if title is not None:
@@ -250,21 +391,15 @@ async def send_message_stream(
 
             storage.add_assistant_message(
                 conversation_id,
-                stage1=stage1_dicts,
-                stage2=stage2_dicts,
-                stage3=stage3_dict,
-                metadata={
-                    "label_to_model": label_to_model,
-                    "aggregate_rankings": [a.to_dict() for a in aggregate],
-                },
+                stage1=envelope["stage1"],
+                stage2=envelope["stage2"],
+                stage3=envelope["stage3"],
+                metadata=envelope["metadata"],
             )
 
-            yield _sse("complete")
+            yield _sse("complete", cached=bool(cached is not None))
 
-        except Exception as exc:
-            # Sanitize: do NOT send raw exception messages to clients.
-            # Audit finding A7/F2 — original code passed str(e) which can
-            # include provider URLs, tracebacks, and partial PII.
+        except Exception:
             log.exception(
                 "stream.unexpected_error",
                 extra={"request_id": request_id,

@@ -1,10 +1,14 @@
 # Changes — `changes` branch
 
-This branch contains the §2 critical refactor from the production-readiness
-audit (see `audit/06_proposed_changes.md` in the parent project workspace
-for the full audit). It does **not** include the eval framework (§3), the
-cost-control layer (§4), or the P1 follow-ups (§5). Those are deliberately
-left for separate branches once §2 is merged.
+This branch contains the §2 critical refactor and the §4 cost-control
+layer (smart routing, in-memory LRU cache, per-stage `max_tokens`
+caps) from the production-readiness audit. See
+`audit/06_proposed_changes.md` in the parent project workspace for
+the full audit context.
+
+It does **not** include the eval framework (§3) or the P1 follow-ups
+(§5 SQLite migration, conversation memory, etc.) — those are tracked
+in `FUTURE_SCOPE.md` for separate branches.
 
 ## What this branch fixes
 
@@ -35,9 +39,28 @@ left for separate branches once §2 is merged.
 | M16 | No startup config validation | `RuntimeError` in `backend/config.py` if key missing |
 | M21 | No request body size limit | 64 KB cap + Pydantic `max_length=8192` on content |
 
-**24 of 47 audit findings + missing-features resolved by this single
-branch.** The remaining 23 are P1 (separate branches) or out of scope
-(see `audit/06_proposed_changes.md` §6).
+**29 of 47 audit findings + missing-features resolved by this single
+branch.**
+
+### Cost-control layer (new in this branch)
+
+| Audit ID | Item | Where it landed |
+|---|---|---|
+| C1 | No caching; every query = 9 LLM calls (2N + 1, default N=4) | `backend/cache.py` (LRU) wired in `backend/main.py` |
+| M4 | Caching layer absent | `backend/cache.py` |
+| M13 | Smart routing absent — `run_full_council` always called | `backend/router.py` + main.py wiring |
+| M20 | No cost guardrail | partial — cache + routing reduce spend; explicit \$ caps in FUTURE_SCOPE |
+| C2/C3 | Per-model parameter tuning absent | `STAGE1_MAX_TOKENS=800`, `STAGE2_MAX_TOKENS=400`, `CHAIRMAN_MAX_TOKENS=1000` activated in `config.py` (was `None`/uncapped) |
+
+**Caveat called out in code and FUTURE_SCOPE.md:** the proposed-changes
+doc framed this layer as "~70% cost reduction with no quality loss
+*assuming the eval framework confirms the routing boundary is sound.*"
+The eval framework is not in this branch — it is in
+`FUTURE_SCOPE.md`. Until eval data exists, the routing prompt and
+heuristic thresholds are a hypothesis, not a measured optimization.
+
+The remaining 18 catalog items are P1 follow-ups or explicitly out of
+scope (see `audit/06_proposed_changes.md` §5–§6 and `FUTURE_SCOPE.md`).
 
 ## Wire-protocol changes (frontend will need updates)
 
@@ -78,11 +101,19 @@ data: {"type": "stage3_complete", "data": {
 }}
 ```
 
-Two new SSE events:
+Five new SSE events (added across the refactor + cost-control commits):
 
 - `title_failed` — title-gen failed; conversation has no title.
 - `error` — fatal server-side error during streaming; carries `request_id`,
   `kind`, and `detail`. Never carries raw exception text.
+- `cache_hit` — fired before stage events when the cache served the
+  response. Cached envelope's three stage events follow.
+- `routing_decision` — fired after a cache miss with `use_council`,
+  `reason`, and `classifier_used` fields. Frontend renders a banner.
+- `solo_start` / `solo_complete` — fired when smart routing skipped
+  the council and ran the chairman alone. The same payload is also
+  emitted as `stage3_complete` so existing frontend renderers keep
+  working without changes.
 
 ### Persistence shape
 
@@ -111,6 +142,11 @@ New environment variables (all optional with sensible defaults):
 | `STAGE2_MAX_TOKENS` | `None` (uncapped) | Output cap for council stage 2 ranking |
 | `CHAIRMAN_MAX_TOKENS` | `None` (uncapped) | Output cap for chairman synthesis |
 | `TITLE_MODEL` | `google/gemini-2.5-flash` | Cheap model for conversation titles |
+
+## New endpoint
+
+`GET /api/cache/stats` — returns hit/miss/store/eviction counters and
+`hit_rate`. Read-only, no auth (no sensitive data).
 
 ## Running
 

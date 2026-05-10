@@ -71,6 +71,28 @@ export default function ChatInterface({
                 <div className="assistant-message">
                   <div className="message-label">LLM Council</div>
 
+                  {/* Cache + routing metadata banner */}
+                  {(msg.cacheInfo?.hit || msg.routingDecision) && (
+                    <div className="routing-banner">
+                      {msg.cacheInfo?.hit && (
+                        <span className="routing-tag routing-tag-cache">
+                          ⚡ cached
+                        </span>
+                      )}
+                      {!msg.cacheInfo?.hit && msg.routingDecision && (
+                        msg.routingDecision.useCouncil ? (
+                          <span className="routing-tag routing-tag-council">
+                            ⚖ full council ({msg.routingDecision.reason.replace(/_/g, ' ')})
+                          </span>
+                        ) : (
+                          <span className="routing-tag routing-tag-solo">
+                            ↷ chairman only ({msg.routingDecision.reason.replace(/_/g, ' ')})
+                          </span>
+                        )
+                      )}
+                    </div>
+                  )}
+
                   {/* Stream-level fatal error banner */}
                   {msg.streamError && (
                     <div className="stream-error-banner">

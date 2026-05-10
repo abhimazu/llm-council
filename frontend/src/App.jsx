@@ -94,6 +94,9 @@ function App() {
         metadata: null,
         loading: { stage1: false, stage2: false, stage3: false },
         streamError: null,
+        cacheInfo: null,
+        routingDecision: null,
+        soloModel: null,
         _pendingToken: optimisticToken,
       };
 
@@ -166,6 +169,35 @@ function App() {
               m.loading = { stage1: false, stage2: false, stage3: false };
             });
             setIsLoading(false);
+            break;
+
+          case 'cache_hit':
+            updateLastAssistant((m) => {
+              m.cacheInfo = { hit: true };
+            });
+            break;
+
+          case 'routing_decision':
+            updateLastAssistant((m) => {
+              m.routingDecision = {
+                useCouncil: !!event.use_council,
+                reason: event.reason || 'unknown',
+                classifierUsed: !!event.classifier_used,
+              };
+            });
+            break;
+
+          case 'solo_start':
+            updateLastAssistant((m) => {
+              m.loading = { ...m.loading, stage3: true };
+              m.soloModel = event.model || null;
+            });
+            break;
+
+          case 'solo_complete':
+            // The backend also emits stage3_complete with the same
+            // payload, so stage3 will land via that case. Nothing to
+            // do here beyond acknowledging.
             break;
 
           default:

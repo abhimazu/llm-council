@@ -72,14 +72,16 @@ ROUTING_MODEL = "google/gemini-2.5-flash"
 # ---------------------------------------------------------------------------
 # Per-stage output caps. ``None`` = uncapped.
 # ---------------------------------------------------------------------------
-# Defaults are None to preserve the original uncapped behavior. The
-# eval framework (proposed-changes §3) will inform the right values.
-# A 150-token cap on Stage-2 truncates rankings mid-list and produces
-# parse_status="partial" — observed live in 05_paid_verification.md.
+# Defaults activated by the cost-control commit. Original code shipped
+# with no caps, allowing flagship reasoning models to run unbounded
+# output at high cost. These values are conservative and may truncate
+# verbose responses; the parser tolerates partial rankings via
+# parse_status="partial". Tune after the eval framework lands
+# (FUTURE_SCOPE.md). Set any to None to restore uncapped behavior.
 
-STAGE1_MAX_TOKENS: Optional[int] = None
-STAGE2_MAX_TOKENS: Optional[int] = None
-CHAIRMAN_MAX_TOKENS: Optional[int] = None
+STAGE1_MAX_TOKENS: Optional[int] = 800
+STAGE2_MAX_TOKENS: Optional[int] = 400
+CHAIRMAN_MAX_TOKENS: Optional[int] = 1000
 
 
 # ---------------------------------------------------------------------------

@@ -187,3 +187,37 @@
   margin-top: 6px;
   font-size: 0.95em;
 }
+
+/* Routing decision + cache hit banner (cost-control commit) */
+.routing-banner {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+  font-size: 0.78em;
+  flex-wrap: wrap;
+}
+.routing-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+.routing-tag-cache {
+  background: #e3f6f5;
+  color: #00695c;
+  border-color: #80cbc4;
+}
+.routing-tag-council {
+  background: #f0e6ff;
+  color: #5e35b1;
+  border-color: #b39ddb;
+}
+.routing-tag-solo {
+  background: #fff8e1;
+  color: #8d6e00;
+  border-color: #ffd54f;
+}
