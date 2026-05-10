@@ -132,7 +132,8 @@ pip install pytest pytest-asyncio
 pytest tests/ -v
 ```
 
-45 unit tests pass in <0.1s. No LLM calls; all httpx-mocked. Coverage:
+45 backend unit tests pass in <0.1s. Frontend `npm run build` passes.
+No LLM calls in the test loop; all httpx-mocked. Coverage:
 - error classification matrix
 - ranking parser (clean / partial / parse_error)
 - query_model (success, 401, 429+retry, 503+retry, 400, malformed, parallel)
@@ -154,9 +155,13 @@ In line with "scope ruthlessly" from the work-trial brief:
 - **No cost-control layer** (smart routing, caching, budget caps).
   Spec in §4; needs the eval framework to land first to inform the
   routing boundary.
-- **No frontend changes.** The Vite+React app needs to be updated
-  to render the new structured `status` and `error` shapes. That's
-  a separate PR; the backend contract is what this branch delivers.
+- ~~No frontend changes.~~ **Frontend is now updated** in commit
+  `06647a8`. `Stage1`/`Stage2`/`Stage3` components render error
+  states and partial parses; `App.jsx` handles `title_failed` and
+  the new structured `error` event; `Stage3` detects the legacy
+  `Error: Unable to generate final synthesis.` string in old
+  persisted conversations and renders an error state for them.
+  Vite build verified.
 - **No CI / GitHub Actions.** Tests run locally; CI is a follow-up.
 
 ## How to push and review
