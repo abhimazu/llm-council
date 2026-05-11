@@ -100,7 +100,7 @@ cd frontend && npm install && cd ..
 echo "OPENROUTER_API_KEY=sk-or-v1-..." > .env
 ```
 
-> **Note on models:** `backend/config.py` ships with the latest May 2026 flagship lineup (Claude Opus 4.7 chairman; Sonnet 4.6, GPT-5.4, Gemini 3.1 Pro Preview, Grok 4.3 council). The original Karpathy config referenced future-dated names like `gpt-5.1` and `gemini-3-pro-preview` that don't actually exist on OpenRouter. Edit the constants in `config.py` if you want different models.
+> **Note on models:** `backend/config.py` ships with the **cheap-model lineup verified by the $0.044 dev sweep** (council: `gemini-2.5-flash`, `gpt-4o-mini`, `claude-3.5-haiku`, `grok-4-fast`; chairman: `claude-3.5-haiku`; title + routing: `gemini-2.5-flash`). Same models that were live on OpenRouter on 2026-05-10 when the dev sweep ran (see `docs/10_evals.md`). The original Karpathy config referenced future-dated names like `gpt-5.1` and `gemini-3-pro-preview` that don't actually exist on OpenRouter — running them returned HTTP 404, which this branch surfaces correctly as a structured A5 error envelope instead of silently persisting a fake answer. For a flagship run, edit `COUNCIL_MODELS` and `CHAIRMAN_MODEL` in `config.py` to the May 2026 flagship lineup you've verified for your account (Opus 4.7 / Sonnet 4.6 / GPT-5.4 / Gemini 3.1 Pro Preview / Grok 4.3 referenced in `docs/09_cost_and_scaling.md`).
 
 ### Run
 

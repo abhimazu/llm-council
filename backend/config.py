@@ -42,11 +42,18 @@ if not OPENROUTER_API_KEY:
 # ---------------------------------------------------------------------------
 
 # Council members - list of OpenRouter model identifiers.
+#
+# Upstream Karpathy referenced future-dated model names that don't exist
+# on OpenRouter (gpt-5.1, gemini-3-pro-preview, claude-sonnet-4.5, grok-4).
+# This list uses models verified live on OpenRouter as of 2026-05-10
+# (same lineup that ran the $0.044 dev sweep documented in
+# docs/10_evals.md). Swap to the May 2026 flagship lineup once you've
+# verified availability for your account.
 COUNCIL_MODELS = [
-    "openai/gpt-5.1",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4",
+    "google/gemini-2.5-flash",
+    "openai/gpt-4o-mini",
+    "anthropic/claude-3.5-haiku",
+    "x-ai/grok-4-fast",
 ]
 
 # Chairman model - synthesizes the final response.
@@ -56,7 +63,11 @@ COUNCIL_MODELS = [
 # with the model name (council.py:_build_chairman_prompt) and can
 # recognize itself, which has been observed to amplify self-favoritism
 # already present in Stage 2. Prefer a model NOT in COUNCIL_MODELS.
-CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
+#
+# claude-3.5-haiku also sits in COUNCIL_MODELS for the dev config
+# above — knowingly accepting the B5 risk for the cheap-and-working
+# combo; swap to a non-council model for any production-leaning run.
+CHAIRMAN_MODEL = "anthropic/claude-3.5-haiku"
 
 # Title generation model — small/cheap; best-effort, never blocks the
 # main response flow.
