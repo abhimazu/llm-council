@@ -20,7 +20,7 @@ If you're a reviewer: start with [CHANGES.md](./CHANGES.md) for the per-finding 
 | Tests | None | 65 unit tests passing in <0.1s, no LLM spend |
 | Docs | "99% vibe-coded" disclaimer | `CHANGES.md` (per-finding map), `FUTURE_SCOPE.md` (priority spine) |
 
-**29 of 47 audit findings + missing-feature items resolved.** The remaining 18 are P1 follow-ups (separate branches) or explicitly out of scope. See `CHANGES.md` and `FUTURE_SCOPE.md`.
+**30 of 47 audit findings + missing-feature items resolved** (M2 — eval framework — moved from `Specced` to `Delivered: scaffold + 21-row dev sweep` after `docs/10_evals.md` landed). The remaining 17 are P1 follow-ups (separate branches) or explicitly out of scope. See `CHANGES.md` and `FUTURE_SCOPE.md`.
 
 ---
 
@@ -236,11 +236,14 @@ The current code still uses filesystem JSON storage (`backend/storage.py`). Unde
 
 **→ Run with `--workers 1` or stick with the default `./start.sh` until P1-1 (SQLite migration) lands. See `FUTURE_SCOPE.md`.**
 
-### 2. Cost-control claims are unverified for quality
+### 2. Cost-control claims are partially verified — flagship sweep still pending
 
-The cost-control layer reduces dollars per query, but whether the routing classifier's decisions preserve answer quality is **unmeasured**. The proposed-changes doc framed savings as "with no quality loss *assuming the eval framework confirms the routing boundary is sound.*" The eval framework is in `FUTURE_SCOPE.md` (P1), not built.
+The cost-control layer reduces dollars per query. Whether the routing classifier's decisions preserve answer quality has been **measured on cheap models and is still hypothesised at flagship scale**:
 
-**→ Don't deploy the routing layer to production traffic without first running the eval framework. Until then, set `STAGE1_MAX_TOKENS = None` etc. in `config.py` and short-circuit the router to always engage the council if you need conservative behavior.**
+- **Measured (dev sweep, $0.044, 21 rows, cheap models):** 5/5 factual queries routed to solo and answered correctly; 3/3 trap questions declined gracefully across all conditions; forced council cost ~46× solo on factual queries for identical correctness. Full numbers in `docs/10_evals.md`.
+- **Hypothesised (not yet measured):** the same routing quality on the May 2026 flagship lineup (Opus 4.7 chairman, Sonnet 4.6 / GPT-5.4 / Gemini 3.1 Pro Preview / Grok 4.3 council). The full 100-question × 3-condition flagship sweep is the natural next run (~$30–60); harness is in `evals/`, JSONL is committed at `evals/runs/sweep_20260510_180256.jsonl` for the dev run.
+
+**→ Cheap-model traffic: the router is validated on the sample we ran. Flagship production traffic: run the flagship sweep first. Conservative fallback in either case: set `STAGE1_MAX_TOKENS = None` etc. in `config.py` and short-circuit the router to always engage the council.**
 
 ### 3. The chat product still doesn't actually chat
 
@@ -260,14 +263,18 @@ Other limits documented in `FUTURE_SCOPE.md`:
 
 ## How to verify the audit findings yourself
 
-The candidate's submission folder has 9 markdown docs walking through the audit + verification + sweep methodology. The most useful ones for verifying claims:
+The 10 underlying chapter docs are now in this repo under `docs/`. They walk through the audit + verification + sweep methodology. The most useful ones for verifying claims:
 
-- `04_runtime_verification.md` — every audit finding either confirmed or corrected with a probe command you can re-run
-- `05_paid_verification.md` — $0.00331 cheap-model traffic that confirms the end-to-end pipeline behavior
-- `07_flagship_sweep_results.md` — $0.188 flagship-model sweep that anchors the cost-control validation
-- `09_cost_and_scaling.md` — TCO at 10k users/day with sourced pricing for May 2026
+- `docs/04_runtime_verification.md` — every audit finding either confirmed or corrected with a probe command you can re-run
+- `docs/05_paid_verification.md` — $0.00331 cheap-model traffic that confirms the end-to-end pipeline behavior
+- `docs/07_flagship_sweep_results.md` — $0.188 flagship-model sweep that anchors the cost-control validation
+- `docs/09_cost_and_scaling.md` — TCO at 10k users/day with sourced pricing for May 2026
+- `docs/10_evals.md` — eval framework spec + 21-row dev-sweep results (routing quality, council vs solo cost ratios, trap behaviour, honest gaps)
 
-Sweep telemetry artifacts (replay-able): `llm-council-changes/sweep_artifacts/` in the candidate's submission folder.
+Replay-able artifacts:
+
+- `evals/runs/sweep_20260510_180256.jsonl` — raw JSONL of the dev sweep; pass through `python -m evals.report` to regenerate the numbers in `docs/10_evals.md`.
+- `docs/07_flagship_sweep_results.xlsx` — 7-tab spreadsheet of the flagship-model cost sweep.
 
 ---
 

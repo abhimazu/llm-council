@@ -14,14 +14,19 @@ than marking it done — the file should always reflect future work only.
 
 ## Conviction summary
 
-The critical refactor (§2 of the audit) and the cost-control layer (§4)
-are in this branch. The next three things to build, in this order:
+The critical refactor (§2 of the audit), the cost-control layer (§4),
+and the eval framework (§3) are in this branch. The harness was
+exercised by a $0.04 cheap-model dev sweep — full numbers in
+`docs/10_evals.md`. The next three things to build, in this order:
 
-1. **Eval framework (§3 of the audit).** It's the most-load-bearing
-   item: cost-control's "70 % cost reduction with no quality loss" claim
-   is a *hypothesis* until eval data exists. If you build only one of
-   the items below, build this one — every other decision becomes
-   defensible (or refutable) in light of its data.
+1. **Flagship eval sweep (§3 follow-on).** The harness exists and runs;
+   the dev sweep validated it on cheap models. The remaining work is
+   running the full 100-question × 3-condition sweep on the May 2026
+   flagship lineup (~$30–60). Until that run completes, the routing
+   thresholds are *measured on cheap models and hypothesised at
+   flagship scale.* If you fund only one of the items below, fund
+   this one — every quality claim in Part V of the submission depends
+   on it.
 2. **P1-1 storage migration (SQLite).** The 64 % data-loss race
    condition is dormant under single-worker uvicorn but active in any
    multi-worker production deploy. Until this lands, deploying this
@@ -35,67 +40,68 @@ Everything below is ordered against that priority spine.
 
 ---
 
-## P1 — eval framework (§3 of `06_proposed_changes.md`)
+## P1 — flagship eval sweep (the framework already exists)
 
-**The headline claim from cost-control depends on this layer.** Smart
-routing in `backend/router.py` decides whether to engage the council or
-skip it based on a heuristic + a cheap classifier. Whether those
-decisions are *correct* in aggregate is currently unknown. The eval
-framework is the measurement layer that turns "we hope this is fine"
-into "we measured it, here is the boundary."
+**The eval framework now lives in the branch under `evals/`** with full
+spec in `docs/10_evals.md`. It was exercised by a 21-row cheap-model
+dev sweep (total spend $0.044) that validated the routing layer on a
+small sample: 5/5 factual queries routed to solo and correct; 3/3
+traps declined gracefully across all conditions; forced council cost
+~46× solo on factual queries for identical correctness. **What is
+still pending is the full sweep on flagship models.**
 
-### What to build
+### What to run (not build)
 
-```
-evals/
-├── datasets/
-│   ├── factual.jsonl          # 50 verifiable-answer questions
-│   ├── open_ended.jsonl       # 25 graded-by-rubric questions
-│   └── trap.jsonl             # 25 "no good answer" / context-dependent
-├── runners/
-│   ├── single_chairman.py     # baseline: chairman alone
-│   ├── council_2.py           # 2-member council
-│   ├── council_4.py           # 4-member council (current default)
-│   └── routed.py              # router.should_engage_council() → either
-├── judges/
-│   ├── factual_grader.py      # exact-match + judge-LLM with calibration
-│   ├── rubric_grader.py       # judge-LLM scoring on 4 dimensions
-│   └── hallucination_detector.py
-├── metrics/
-│   ├── correctness.py
-│   ├── council_uplift.py      # delta vs single-chairman baseline
-│   ├── hallucination_rate.py
-│   ├── cost_per_correct.py
-│   ├── self_favoritism.py     # Stage-2 ranker bias score (B9)
-│   └── routing_quality.py     # router decision quality
-├── runs/                      # output JSONLs
-└── report.py                  # markdown table + chart
+```bash
+# 1. Restore flagship models in backend/config.py if you've swapped them
+#    (the committed config already targets flagship — only swap back if
+#    you ran the cheap-model sweep locally).
+# 2. Run the full sweep with a budget guard:
+python -m evals.run_sweep \
+    --conditions C0,C2,R \
+    --budget 80 \
+    --time-budget 3600 \
+    --output evals/runs/$(date +%Y%m%d_%H%M%S)_flagship.jsonl
+
+# 3. Roll up:
+python -m evals.report evals/runs/<file>.jsonl
 ```
 
-**The most important new metric: `routing_quality`.** For each query in
-the dataset, record both the routing decision *and* the manually-graded
-correctness of the SOLO answer. The metric is then: when `use_council=False`,
-what fraction of answers were correct? When `use_council=True`, what
-fraction would have been *equally* correct without the council? That ratio
-is the answer to "is the routing boundary sound."
+The orchestrator is resume-aware (`--resume <path>`); a sweep that
+trips the budget cap or the time budget exits cleanly with work-to-date
+checkpointed to JSONL.
 
 ### Cost
 
-- Cheap-model dev sweep (gemini-2.5-flash + gpt-4o-mini + claude-3.5-haiku):
-  ~$5 for the full 100-question × 4-condition × 3-run sweep.
-- One-shot flagship verification sweep: ~$60.
-- Calibration of judge-LLM against ~20 human labels: free (manual).
+- Full 100-question × 3-condition sweep on flagship models: **~$30–60**
+  (estimate from the cheap-model cost ratio × the May 2026 flagship
+  per-token prices; the C2 forced-council condition dominates).
 
 ### Effort
 
-4 senior-engineer days as scoped in `06_proposed_changes.md` §3.6.
+0 engineering days. This is "spend, not engineering." The harness, the
+dataset, the judges, the runners, and the report generator are all
+committed code on the branch.
+
+### Two small harness follow-ups (each <1 hour)
+
+1. **Populate `raw_envelope.ranks_per_member` for C2 rows** in
+   `evals/runners/council_full.py` so the `self_favoritism` metric can
+   be re-measured against the flagship lineup. The cheap-model dev
+   sweep didn't capture this field; the flagship sweep should.
+2. **Make the rubric judge JSON parser tolerant** of preamble before
+   the JSON block (`evals/judges/rubric.py:_extract_json`). The one
+   open-ended question in the dev sweep returned `avg_score=0` due to
+   a JSON parse failure; a regex grab for the first `{...}` block fixes
+   it.
 
 ### Why this is P1, not P0
 
-It's gated behind eval LLM budget. If the budget is approved, this
-becomes P0 — until then, the cost-control layer remains an unverified
-hypothesis. **Do not deploy the routing layer to production traffic
-without this evidence.**
+It's gated only behind LLM spend. With the harness committed and dev-sweep
+validated, this is a 1-hour budget approval + 1-hour sweep wall-clock +
+re-render of the report. **Do not deploy the routing layer to flagship
+production traffic without this evidence**, but ramp-up on cheap models
+is already validated.
 
 ---
 
