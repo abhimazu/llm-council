@@ -1,13 +1,14 @@
 # LLM Council
 
-> **`changes` branch:** this branch contains the §2 critical refactor from
-> the production-readiness audit. The original silent-failure pattern in
+> **`changes` branch:** this branch contains the §2 critical refactor, a
+> §4 cost-control layer, and an §3 eval framework from the production-
+> readiness audit. The original silent-failure pattern in
 > `backend/openrouter.py` and `backend/council.py` has been replaced with
-> structured errors that flow end-to-end. See **[CHANGES.md](CHANGES.md)**
-> for the full list, wire-protocol changes the frontend must handle, and
-> what's intentionally **not** in this branch.
+> structured errors that flow end-to-end. See **[CHANGES_README.md](CHANGES_README.md)**
+> for the full list, wire-protocol changes the frontend must handle,
+> known limits, and what's intentionally **not** in this branch.
 >
-> **45 unit tests pass.** Run with `pytest tests/ -v`.
+> **65 unit tests pass.** Run with `pytest tests/ -v`.
 
 ---
 

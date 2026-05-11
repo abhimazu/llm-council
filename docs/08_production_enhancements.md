@@ -171,6 +171,6 @@ For the cost-control validation specifically, the sweep artifacts (`raw_calls.js
 | `07_flagship_sweep_results.md` | $0.188 flagship-model cost-control validation |
 | **`08_production_enhancements.md`** | **This doc** |
 | `09_cost_and_scaling.md` | TCO at 10k users/day with real cloud + API pricing |
-| `CHANGES.md` (in branch) | Per-finding map of audit IDs to commit locations |
+| `CHANGES_README.md` (in branch) | Entry point: per-finding map, how to run, wire-protocol changes, known limits |
 | `FUTURE_SCOPE.md` (in branch) | What's deliberately not in the branch |
 | `flagship_sweep_results.xlsx` | Sweep telemetry in 7 spreadsheet tabs |

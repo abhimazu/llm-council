@@ -1,8 +1,8 @@
 # LLM Council — `changes` branch
 
-This branch ships a **production-readiness refactor** + a **cost-control layer** on top of `karpathy/llm-council`. It is the deliverable for a Meraki Labs Founding AI Engineer work trial (PS 2 — Public Repo Audit).
+This branch ships a **production-readiness refactor** + a **cost-control layer** + an **eval framework** on top of `karpathy/llm-council`. It is the deliverable for a Meraki Labs Founding AI Engineer work trial (PS 2 — Public Repo Audit).
 
-If you're a reviewer: start with [CHANGES.md](./CHANGES.md) for the per-finding map, [FUTURE_SCOPE.md](./FUTURE_SCOPE.md) for what was deliberately left out, and the audit doc set in the candidate's submission folder for the full reasoning chain.
+If you're a reviewer: this README is the single entry point. The audit-ID-to-code map is in § "Audit ID → where each finding landed" below; the chapter docs that walk through the audit reasoning are in `docs/`; what was deliberately left out is in [FUTURE_SCOPE.md](./FUTURE_SCOPE.md).
 
 ---
 
@@ -18,9 +18,58 @@ If you're a reviewer: start with [CHANGES.md](./CHANGES.md) for the per-finding 
 | Storage | Filesystem JSON, no validation, race conditions under multi-worker | Adds UUID-regex validation; **storage race itself is NOT fixed in this branch — see "Known limits" below** |
 | Frontend | Crashes on `null` response, renders error strings as real answers | Renders error states, partial-parse badges, cache-hit banner, routing-decision banner |
 | Tests | None | 65 unit tests passing in <0.1s, no LLM spend |
-| Docs | "99% vibe-coded" disclaimer | `CHANGES.md` (per-finding map), `FUTURE_SCOPE.md` (priority spine) |
+| Docs | "99% vibe-coded" disclaimer | `CHANGES_README.md` (this file — entry point + per-finding map), `FUTURE_SCOPE.md` (priority spine), `docs/` (10 chapter docs) |
 
-**30 of 47 audit findings + missing-feature items resolved** (M2 — eval framework — moved from `Specced` to `Delivered: scaffold + 21-row dev sweep` after `docs/10_evals.md` landed). The remaining 17 are P1 follow-ups (separate branches) or explicitly out of scope. See `CHANGES.md` and `FUTURE_SCOPE.md`.
+**30 of 47 audit findings + missing-feature items resolved** (M2 — eval framework — moved from `Specced` to `Delivered: scaffold + 21-row dev sweep` after `docs/10_evals.md` landed). The remaining 17 are P1 follow-ups (separate branches) or explicitly out of scope. See the audit-ID map below and `FUTURE_SCOPE.md`.
+
+---
+
+## Audit ID → where each finding landed
+
+The branch's commits resolve these 24 catalog items from the audit (`docs/03_audit_hypothesis.md`). For the cost-control and eval-framework items, see the next table.
+
+| Audit ID | Item | Where it landed |
+|---|---|---|
+| A1 | Single broad `except Exception` collapsing all LLM error classes | `backend/openrouter.py` |
+| A2 | `asyncio.gather` without `return_exceptions=True` | `backend/openrouter.py:query_models_parallel` |
+| A3 | Stage 1 silent-drop of failed council members | `backend/council.py:stage1_collect_responses` |
+| A4 | Stage 2 silent-drop of failed rankers | `backend/council.py:stage2_collect_rankings` |
+| A5 | **Chairman fallback string masquerading as a real answer** (root) | `backend/council.py:stage3_synthesize_final` |
+| A6 | Title-gen failure indistinguishable from default | `backend/council.py:generate_conversation_title` |
+| A7 | Stream error path leaked internals to client | `backend/main.py:event_generator` |
+| B1 | Stage-2 ranking parser brittle to format non-compliance | `backend/council.py:parse_ranking_from_text` |
+| B2 | Aggregate ranking from partial rankers with no signal | `backend/council.py:calculate_aggregate_rankings` |
+| B4 | Anonymization labels deterministic by `COUNCIL_MODELS` order | `backend/council.py:_build_label_mapping` |
+| B7 | `/message` and `/message/stream` produce different error UX | both endpoints route through `run_full_council` |
+| B9 | (partly) Self-favoritism in Stage-2 rankings | mitigated via shuffled labels; full fix is eval-framework concern |
+| C3 | No per-model parameter tuning (`max_tokens`, etc.) | `query_model(max_tokens=...)`; per-stage configs in `config.py` |
+| C4 | Hardcoded 120s per-call timeout | reduced to 30s default; configurable per call |
+| D3 | Wide-open CORS | now driven by `CORS_ORIGINS` env var |
+| E1 | Zero structured logging | `_configure_logging()` in `backend/config.py` |
+| E2 | OpenRouter `usage` field discarded | captured per call, returned to callers, logged |
+| F2 | Stream error path can leak server-side details | sanitization layer in `event_generator` |
+| F3 | (partly) No application-level rate limiting | request-body size cap; full per-IP rate limiting is P1 |
+| G3 | Path-traversal hardening at storage layer | UUID-regex validation in `backend/storage.py` |
+| M5 | No retry / backoff | exponential backoff with jitter for retryable kinds |
+| M8 | No token / cost tracking | `usage` returned + structured-logged per call |
+| M16 | No startup config validation | `RuntimeError` in `backend/config.py` if key missing |
+| M21 | No request body size limit | 64 KB cap + Pydantic `max_length=8192` on content |
+
+### Cost-control layer (new modules)
+
+| Audit ID | Item | Where it landed |
+|---|---|---|
+| C1 | No caching; every query = 9 LLM calls (2N + 1, default N=4) | `backend/cache.py` (LRU) wired in `backend/main.py` |
+| M4 | Caching layer absent | `backend/cache.py` |
+| M13 | Smart routing absent — `run_full_council` always called | `backend/router.py` + `main.py` wiring |
+| M20 | No cost guardrail | partial — cache + routing reduce spend; explicit `$` caps are in `FUTURE_SCOPE.md` |
+| C2 / C3 | Per-model parameter tuning absent | `STAGE1_MAX_TOKENS=800`, `STAGE2_MAX_TOKENS=400`, `CHAIRMAN_MAX_TOKENS=1000` activated in `config.py` (was `None`/uncapped) |
+
+### Eval framework (new directory)
+
+| Audit ID | Item | Where it landed |
+|---|---|---|
+| M2 | Eval framework absent — no `evals/` dir, no judges, no scoring | `evals/` (datasets, runners, judges, metrics, orchestrator, report). Spec + 21-row dev-sweep results in `docs/10_evals.md`. Raw JSONL in `evals/runs/sweep_20260510_180256.jsonl`. |
 
 ---
 
@@ -155,9 +204,10 @@ llm-council/
 ├── tests/                   ← NEW. 65 unit tests (pytest), httpx-mocked
 │
 ├── pytest.ini               ← NEW. asyncio_mode=auto
-├── CHANGES.md               ← NEW. Per-finding map of audit IDs to commit locations
+├── evals/                   ← NEW. Eval framework (datasets, runners, judges, metrics, orchestrator)
+├── docs/                    ← NEW. 10 chapter docs (01–10) that fed the consolidated submission
+├── CHANGES_README.md        ← THIS FILE. Entry point + per-finding map + how to run + known limits
 ├── FUTURE_SCOPE.md          ← NEW. P1 / P2 / P3 follow-ups with effort + cost estimates
-├── CHANGES_README.md        ← THIS FILE
 ├── README.md                ← original Karpathy README (unchanged)
 └── pyproject.toml           ← unchanged
 ```
@@ -170,7 +220,7 @@ llm-council/
 |---|---|
 | `GET /api/cache/stats` | Returns `{hits, misses, stores, evictions, skipped_error_envelopes, hit_rate}`. Read-only, no auth, no sensitive data. |
 
-Existing endpoints (unchanged paths, **changed payload shapes** — see `CHANGES.md`):
+Existing endpoints (unchanged paths, **changed payload shapes** — see the before/after below):
 
 | Endpoint | What's different |
 |---|---|
@@ -178,7 +228,53 @@ Existing endpoints (unchanged paths, **changed payload shapes** — see `CHANGES
 | `POST /api/conversations/{id}/message` | Same envelope shape as the streaming endpoint (resolves audit B7 endpoint inconsistency) |
 | `POST /api/conversations/{id}/message/stream` | New SSE event types: `cache_hit`, `routing_decision`, `solo_start`, `solo_complete`, `title_failed`. New per-entry `status` field on existing event payloads. |
 
-See `CHANGES.md` § "Wire-protocol changes" for the before/after of every event payload.
+### Wire-protocol changes — before / after
+
+The SSE event *names* are unchanged. The shape of `data` inside each event has changed — frontends must handle the new `status` field.
+
+**Before:**
+
+```jsonc
+// stage1_complete
+data: {"type": "stage1_complete", "data": [
+  {"model": "openai/gpt-5.1", "response": "..."}      // failed members silently absent
+]}
+
+// stage3_complete (chairman 401)
+data: {"type": "stage3_complete", "data": {
+  "model": "google/gemini-3-pro-preview",
+  "response": "Error: Unable to generate final synthesis."  // string masquerading as a real answer
+}}
+```
+
+**After:**
+
+```jsonc
+// stage1_complete
+data: {"type": "stage1_complete", "data": [
+  {"model": "openai/gpt-5.1", "status": "ok", "response": "...", "usage": {...}},
+  {"model": "anthropic/claude-sonnet-4.5", "status": "error",
+   "error": {"kind": "rate_limit", "model": "...", "detail": "HTTP 429",
+             "retryable": true, "upstream_status": 429, "attempt": 1}}
+]}
+
+// stage3_complete (chairman 401)
+data: {"type": "stage3_complete", "data": {
+  "model": "google/gemini-3-pro-preview",
+  "status": "error",
+  "error": {"kind": "auth", "detail": "HTTP 401", "retryable": false, ...}
+}}
+```
+
+Five new SSE events (added across the refactor + cost-control commits):
+
+- `title_failed` — title-gen failed; conversation has no title.
+- `error` — fatal server-side error during streaming; carries `request_id`, `kind`, and `detail`. Never carries raw exception text.
+- `cache_hit` — fired before stage events when the cache served the response. Cached envelope's three stage events follow.
+- `routing_decision` — fired after a cache miss with `use_council`, `reason`, and `classifier_used` fields. Frontend renders a banner.
+- `solo_start` / `solo_complete` — fired when smart routing skipped the council and ran the chairman alone. The same payload is also emitted as `stage3_complete` so existing frontend renderers keep working without changes.
+
+Existing on-disk conversations remain readable (the reader does not validate shape). New writes use the structured-status format above. Frontend branches on the presence of the `status` field.
 
 ---
 
