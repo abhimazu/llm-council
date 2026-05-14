@@ -30,7 +30,6 @@ export default function ChatInterface({
   };
 
   const handleKeyDown = (e) => {
-    // Submit on Enter (without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -64,13 +63,49 @@ export default function ChatInterface({
                   <div className="message-label">You</div>
                   <div className="message-content">
                     <div className="markdown-content">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <ReactMarkdown>{msg.content || ''}</ReactMarkdown>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="assistant-message">
                   <div className="message-label">LLM Council</div>
+
+                  {/* Cache + routing metadata banner */}
+                  {(msg.cacheInfo?.hit || msg.routingDecision) && (
+                    <div className="routing-banner">
+                      {msg.cacheInfo?.hit && (
+                        <span className="routing-tag routing-tag-cache">
+                          ⚡ cached
+                        </span>
+                      )}
+                      {!msg.cacheInfo?.hit && msg.routingDecision && (
+                        msg.routingDecision.useCouncil ? (
+                          <span className="routing-tag routing-tag-council">
+                            ⚖ full council ({msg.routingDecision.reason.replace(/_/g, ' ')})
+                          </span>
+                        ) : (
+                          <span className="routing-tag routing-tag-solo">
+                            ↷ chairman only ({msg.routingDecision.reason.replace(/_/g, ' ')})
+                          </span>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                  {/* Stream-level fatal error banner */}
+                  {msg.streamError && (
+                    <div className="stream-error-banner">
+                      <strong>An internal error occurred during this response.</strong>
+                      <div className="error-details-line">
+                        kind: <code>{msg.streamError.kind}</code>
+                        {msg.streamError.requestId && (
+                          <> · request-id: <code>{msg.streamError.requestId}</code></>
+                        )}
+                      </div>
+                      <div className="error-detail-text">{msg.streamError.detail}</div>
+                    </div>
+                  )}
 
                   {/* Stage 1 */}
                   {msg.loading?.stage1 && (

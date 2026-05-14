@@ -1,0 +1,50 @@
+{"id": "fact-001", "question": "What is the capital of France?", "expected": ["Paris"], "category": "factual_simple", "trap": false}
+{"id": "fact-002", "question": "Who wrote the play Hamlet?", "expected": ["William Shakespeare", "Shakespeare"], "category": "factual_simple", "trap": false}
+{"id": "fact-003", "question": "What is 7 plus 8?", "expected": ["15", "fifteen"], "category": "factual_simple", "trap": false}
+{"id": "fact-004", "question": "What is the boiling point of water at sea level in Celsius?", "expected": ["100", "100 degrees", "100°C"], "category": "factual_simple", "trap": false}
+{"id": "fact-005", "question": "What is the chemical symbol for gold?", "expected": ["Au"], "category": "factual_simple", "trap": false}
+{"id": "fact-006", "question": "What year did World War II end?", "expected": ["1945"], "category": "factual_simple", "trap": false}
+{"id": "fact-007", "question": "How many continents are there?", "expected": ["7", "seven"], "category": "factual_simple", "trap": false}
+{"id": "fact-008", "question": "What is the largest planet in our solar system?", "expected": ["Jupiter"], "category": "factual_simple", "trap": false}
+{"id": "fact-009", "question": "What is the speed of light in a vacuum (approximately, in km/s)?", "expected": ["300000", "299792", "approximately 300,000"], "category": "factual_simple", "trap": false}
+{"id": "fact-010", "question": "Who painted the Mona Lisa?", "expected": ["Leonardo da Vinci", "da Vinci"], "category": "factual_simple", "trap": false}
+{"id": "fact-011", "question": "Convert 100 degrees Fahrenheit to Celsius.", "expected": ["37.78", "37.8", "approximately 38"], "category": "factual_simple", "trap": false}
+{"id": "fact-012", "question": "What is the smallest prime number?", "expected": ["2"], "category": "factual_simple", "trap": false}
+{"id": "fact-013", "question": "What does HTTP stand for?", "expected": ["HyperText Transfer Protocol", "Hypertext Transfer Protocol"], "category": "factual_simple", "trap": false}
+{"id": "fact-014", "question": "Who was the first person to walk on the Moon?", "expected": ["Neil Armstrong", "Armstrong"], "category": "factual_simple", "trap": false}
+{"id": "fact-015", "question": "What is 144 divided by 12?", "expected": ["12", "twelve"], "category": "factual_simple", "trap": false}
+{"id": "fact-016", "question": "What is the capital of Japan?", "expected": ["Tokyo"], "category": "factual_simple", "trap": false}
+{"id": "fact-017", "question": "What is the largest ocean on Earth?", "expected": ["Pacific", "Pacific Ocean"], "category": "factual_simple", "trap": false}
+{"id": "fact-018", "question": "Who wrote the novel '1984'?", "expected": ["George Orwell", "Orwell"], "category": "factual_simple", "trap": false}
+{"id": "fact-019", "question": "What is the chemical formula for water?", "expected": ["H2O", "H₂O"], "category": "factual_simple", "trap": false}
+{"id": "fact-020", "question": "How many sides does a hexagon have?", "expected": ["6", "six"], "category": "factual_simple", "trap": false}
+{"id": "fact-021", "question": "What is the square root of 144?", "expected": ["12"], "category": "factual_simple", "trap": false}
+{"id": "fact-022", "question": "What is the currency of the United Kingdom?", "expected": ["pound", "pound sterling", "GBP", "British pound"], "category": "factual_simple", "trap": false}
+{"id": "fact-023", "question": "Which planet is known as the Red Planet?", "expected": ["Mars"], "category": "factual_simple", "trap": false}
+{"id": "fact-024", "question": "How many bones are in the adult human body?", "expected": ["206"], "category": "factual_simple", "trap": false}
+{"id": "fact-025", "question": "Who developed the theory of relativity?", "expected": ["Albert Einstein", "Einstein"], "category": "factual_simple", "trap": false}
+{"id": "fact-026", "question": "What programming language was created by Guido van Rossum?", "expected": ["Python"], "category": "factual_technical", "trap": false}
+{"id": "fact-027", "question": "What does CPU stand for?", "expected": ["Central Processing Unit"], "category": "factual_technical", "trap": false}
+{"id": "fact-028", "question": "What does SQL stand for?", "expected": ["Structured Query Language"], "category": "factual_technical", "trap": false}
+{"id": "fact-029", "question": "In what year was the first iPhone released?", "expected": ["2007"], "category": "factual_simple", "trap": false}
+{"id": "fact-030", "question": "What is the largest desert in the world (by area)?", "expected": ["Antarctica", "Antarctic", "Sahara"], "category": "factual_simple", "trap": false, "note": "accept either — Antarctica is technically largest cold desert; Sahara is largest hot desert"}
+{"id": "fact-031", "question": "Who painted The Starry Night?", "expected": ["Vincent van Gogh", "van Gogh"], "category": "factual_simple", "trap": false}
+{"id": "fact-032", "question": "What is the capital of Australia?", "expected": ["Canberra"], "category": "factual_simple", "trap": false}
+{"id": "fact-033", "question": "What is the longest river in the world?", "expected": ["Nile", "Amazon"], "category": "factual_simple", "trap": false, "note": "accept either — Nile traditionally; Amazon by some recent measurements"}
+{"id": "fact-034", "question": "What is the freezing point of water in Fahrenheit?", "expected": ["32", "32 degrees", "32°F"], "category": "factual_simple", "trap": false}
+{"id": "fact-035", "question": "How many planets are in our solar system?", "expected": ["8", "eight"], "category": "factual_simple", "trap": false}
+{"id": "fact-036", "question": "What is the powerhouse of the cell?", "expected": ["mitochondria", "mitochondrion"], "category": "factual_simple", "trap": false}
+{"id": "fact-037", "question": "What does DNA stand for?", "expected": ["Deoxyribonucleic Acid"], "category": "factual_technical", "trap": false}
+{"id": "fact-038", "question": "What is the first element on the periodic table?", "expected": ["Hydrogen", "H"], "category": "factual_simple", "trap": false}
+{"id": "fact-039", "question": "What does API stand for?", "expected": ["Application Programming Interface"], "category": "factual_technical", "trap": false}
+{"id": "fact-040", "question": "What is the largest mammal on Earth?", "expected": ["Blue whale", "blue whale"], "category": "factual_simple", "trap": false}
+{"id": "fact-041", "question": "Who is the author of 'The Lord of the Rings'?", "expected": ["J.R.R. Tolkien", "Tolkien"], "category": "factual_simple", "trap": false}
+{"id": "fact-042", "question": "What is the chemical symbol for sodium?", "expected": ["Na"], "category": "factual_simple", "trap": false}
+{"id": "fact-043", "question": "How many time zones does the contiguous United States have?", "expected": ["4", "four"], "category": "factual_simple", "trap": false}
+{"id": "fact-044", "question": "What is the smallest country in the world?", "expected": ["Vatican City", "Vatican"], "category": "factual_simple", "trap": false}
+{"id": "fact-045", "question": "What is the world's most spoken language by number of native speakers?", "expected": ["Mandarin", "Mandarin Chinese", "Chinese"], "category": "factual_simple", "trap": false}
+{"id": "fact-046", "question": "What is 2 to the power of 10?", "expected": ["1024", "1,024"], "category": "factual_simple", "trap": false}
+{"id": "fact-047", "question": "What is the capital of Brazil?", "expected": ["Brasília", "Brasilia"], "category": "factual_simple", "trap": false}
+{"id": "fact-048", "question": "What HTTP status code means 'Not Found'?", "expected": ["404"], "category": "factual_technical", "trap": false}
+{"id": "fact-049", "question": "Who founded Microsoft?", "expected": ["Bill Gates and Paul Allen", "Bill Gates", "Gates and Allen"], "category": "factual_simple", "trap": false}
+{"id": "fact-050", "question": "What is the value of pi to two decimal places?", "expected": ["3.14"], "category": "factual_simple", "trap": false}
